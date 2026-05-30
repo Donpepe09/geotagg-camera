@@ -132,42 +132,45 @@ document.addEventListener('DOMContentLoaded', async () => {
             flashEffect.style.opacity = '0';
         }, 50);
 
-        const videoW = video.videoWidth;
-        const videoH = video.videoHeight;
-        
-        // Set canvas dimensions to the final oriented image size (swap if landscape)
-        const isLandscape = (deviceAngle === 90 || deviceAngle === 270);
-        canvas.width = isLandscape ? videoH : videoW;
-        canvas.height = isLandscape ? videoW : videoH;
-
         const ctx = canvas.getContext('2d');
-        ctx.save();
-
-        // 1. Rotate and Translate context so the portrait video frame fills the oriented canvas
-        if (deviceAngle === 90) { // Home button on right
-            ctx.translate(canvas.width, 0);
-            ctx.rotate(Math.PI / 2);
-        } else if (deviceAngle === 270) { // Home button on left
-            ctx.translate(0, canvas.height);
-            ctx.rotate(-Math.PI / 2);
-        } else if (deviceAngle === 180) { // Upside Down
-            ctx.translate(canvas.width, canvas.height);
-            ctx.rotate(Math.PI);
-        }
         
-        ctx.drawImage(video, 0, 0, videoW, videoH);
-        ctx.restore();
+        // Match canvas to actual video stream resolution
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
 
-        // 2. Add metadata overlay (canvas is now "upright" relative to the physical orientation)
-        drawBurnInOverlay(ctx, canvas.width, canvas.height, locSvc, settings);
+        // Draw the camera frame
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Add metadata overlay to the final image
+        drawBurnInOverlay(ctx, canvas.width, canvas.height, locSvc, settings, deviceAngle);
 
         // Export as JPEG
         const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
         savePhoto(dataUrl);
     });
 
-    function drawBurnInOverlay(ctx, w, h, locationData, currentSettings) {
+    function drawBurnInOverlay(ctx, w, h, locationData, currentSettings, angle) {
         ctx.save(); // Save state to avoid side effects
+
+        // Detect if the video buffer orientation matches the device orientation
+        const isBufferPortrait = h > w;
+        const isDeviceLandscape = (angle === 90 || angle === 270);
+
+        // Apply rotation only if buffer orientation differs from device physical orientation
+        if (isBufferPortrait && isDeviceLandscape) {
+            if (angle === 90) { // Rotate 90 deg Clockwise
+                ctx.translate(w, 0);
+                ctx.rotate(Math.PI / 2);
+                [w, h] = [h, w]; // Swap internal bounds for drawing calculations
+            } else if (angle === 270) { // Rotate 90 deg Counter-Clockwise
+                ctx.translate(0, h);
+                ctx.rotate(-Math.PI / 2);
+                [w, h] = [h, w];
+            }
+        } else if (angle === 180) { // Upside Down
+            ctx.translate(w, h);
+            ctx.rotate(Math.PI);
+        }
         
         // Use the smaller dimension for scaling to ensure consistency between portrait/landscape
         const scaleBase = Math.min(w, h);
@@ -271,22 +274,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             overlayBottom.style.inset = '';
 
             // Physical Location Mapping (Move UI based on rotation without rotating text)
-            if (deviceAngle === 90) { // Landscape Left -> Physical bottom on the right
+            if (deviceAngle === 90) { 
                 overlayBottom.style.inset = '20px 20px 20px auto';
                 overlayBottom.style.width = '200px';
                 overlayBottom.style.flexDirection = 'column';
                 overlayBottom.style.alignItems = 'flex-start';
                 overlayBottom.style.textAlign = 'left';
-            } else if (deviceAngle === 270) { // Landscape Right -> Physical bottom on the left
+            } else if (deviceAngle === 270) { 
                 overlayBottom.style.inset = '20px auto 20px 20px';
                 overlayBottom.style.width = '200px';
                 overlayBottom.style.flexDirection = 'column';
-                overlayBottom.style.alignItems = 'flex-start';
-                overlayBottom.style.textAlign = 'left';
-            } else if (deviceAngle === 180) { // Upside Down -> Physical bottom on the top
-                overlayBottom.style.inset = '20px 20px auto 20px';
-                overlayBottom.style.width = 'auto';
-                overlayBottom.style.flexDirection = 'row';
                 overlayBottom.style.alignItems = 'flex-start';
                 overlayBottom.style.textAlign = 'left';
             } else { // Portrait
