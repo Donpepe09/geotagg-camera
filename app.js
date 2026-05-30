@@ -121,45 +121,58 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function drawBurnInOverlay(ctx, w, h, locationData, currentSettings) {
         ctx.save(); // Save state to avoid side effects
-        const padding = w * 0.03;
-        const fontSizeMain = Math.max(24, w * 0.025);
+        
+        // Use the smaller dimension for scaling to ensure consistency between portrait/landscape
+        const scaleBase = Math.min(w, h);
+        const padding = scaleBase * 0.04;
+        const fontSizeMain = scaleBase * 0.045;
         const fontSizeSub = fontSizeMain * 0.7;
+        const lineSpacing = fontSizeMain * 0.2;
 
-        // Draw Semi-transparent Background Bar at bottom
-        const barHeight = h * 0.15;
+        // Dynamic Bar Height based on relative font sizes
+        const barHeight = (fontSizeMain + fontSizeSub * 2) + (lineSpacing * 4) + (padding * 2);
+        
         ctx.fillStyle = `rgba(0, 0, 0, ${currentSettings.opacity})`;
         ctx.fillRect(0, h - barHeight, w, barHeight);
 
         ctx.fillStyle = currentSettings.fontColor;
-        ctx.textAlign = "left";
-        ctx.shadowColor = "black";
-        ctx.shadowBlur = 4;
+        ctx.shadowColor = "rgba(0,0,0,0.8)";
+        ctx.shadowBlur = scaleBase * 0.005; // Adaptive shadow blur relative to resolution
 
-        // Top left: Timestamp
+        // Left Side Content
+        ctx.textAlign = "left";
+        
+        // Timestamp
         ctx.font = `bold ${fontSizeMain}px Arial`;
         const now = new Date();
         const timeStr = now.toLocaleString([], {
             hour12: currentSettings.timeFormat === '12h',
-            year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+            year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
         });
-        ctx.fillText(timeStr, padding, h - (barHeight * 0.6));
+        const timeY = h - barHeight + padding + fontSizeMain;
+        ctx.fillText(timeStr, padding, timeY);
 
-        // Bottom left: Location Info
+        // Location Info
         ctx.font = `${fontSizeSub}px Arial`;
+        const addrY = timeY + fontSizeSub + lineSpacing;
+        const coordsY = addrY + fontSizeSub + lineSpacing;
+        
         const addr = locationData.currentAddress;
         const coords = locationData.currentCoords ? 
             `${locationData.currentCoords.latitude.toFixed(6)}, ${locationData.currentCoords.longitude.toFixed(6)}` : "No GPS Data";
         
-        ctx.fillText(addr, padding, h - (barHeight * 0.35));
-        ctx.fillText(`GPS: ${coords}`, padding, h - (barHeight * 0.15));
+        ctx.fillText(addr, padding, addrY);
+        ctx.fillText(`GPS: ${coords}`, padding, coordsY);
 
-        // Right side: Project Branding (Placeholder)
+        // Right Side Content
         ctx.textAlign = "right";
         const brandText = currentSettings.projectName || "TIMESTAMP PRO CAMERA";
-        ctx.fillText(brandText, w - padding, h - (barHeight * 0.35));
+        ctx.font = `bold ${fontSizeSub}px Arial`;
+        ctx.fillText(brandText, w - padding, addrY);
         
         if (currentSettings.inspector) {
-            ctx.fillText(`Inspector: ${currentSettings.inspector}`, w - padding, h - (barHeight * 0.15));
+            ctx.font = `${fontSizeSub}px Arial`;
+            ctx.fillText(`Inspector: ${currentSettings.inspector}`, w - padding, coordsY);
         }
         ctx.restore(); // Restore state
     }
