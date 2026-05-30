@@ -3,6 +3,8 @@ class LocationManager {
         this.currentCoords = null;
         this.currentAddress = "Searching...";
         this.currentHeading = null;
+        this.lastAddressUpdate = 0;
+        this.updateInterval = 5000; // Throttle geocoding to every 5 seconds
     }
 
     init(onUpdate) {
@@ -10,7 +12,13 @@ class LocationManager {
         navigator.geolocation.watchPosition(
             async (pos) => {
                 this.currentCoords = pos.coords;
-                await this.updateAddress(pos.coords.latitude, pos.coords.longitude);
+                
+                const now = Date.now();
+                if (now - this.lastAddressUpdate > this.updateInterval) {
+                    this.lastAddressUpdate = now;
+                    await this.updateAddress(pos.coords.latitude, pos.coords.longitude);
+                }
+                
                 onUpdate(this);
             },
             (err) => console.warn("GPS Error:", err),

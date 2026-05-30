@@ -8,7 +8,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const locSvc = new LocationManager();
     
     // 1. Start Camera
-    await camera.start();
+    try {
+        await camera.start();
+    } catch (err) {
+        console.error("Failed to initialize camera:", err);
+    }
 
     // 2. Start Location/Compass
     locSvc.init((data) => {
@@ -31,6 +35,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 4. Capture Logic (The "Burn-in" Engine)
     shutter.addEventListener('click', async () => {
+        if (!video.videoWidth) {
+            console.warn("Video stream not ready for capture.");
+            return;
+        }
+
         // Visual Flash Feedback
         flashEffect.style.transition = 'none';
         flashEffect.style.opacity = '1';
@@ -49,14 +58,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
         // Add metadata overlay to the final image
-        drawBurnInOverlay(ctx, canvas.width, canvas.height);
+        drawBurnInOverlay(ctx, canvas.width, canvas.height, locSvc);
 
         // Export as JPEG
         const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
         savePhoto(dataUrl);
     });
 
-    function drawBurnInOverlay(ctx, w, h) {
+    function drawBurnInOverlay(ctx, w, h, locationData) {
+        ctx.save(); // Save state to avoid side effects
         const padding = w * 0.03;
         const fontSizeMain = Math.max(24, w * 0.025);
         const fontSizeSub = fontSizeMain * 0.7;
@@ -78,14 +88,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Bottom left: Location Info
         ctx.font = `${fontSizeSub}px Arial`;
-        const addr = document.getElementById('address-display').innerText;
-        const coords = document.getElementById('coords-display').innerText;
+        const addr = locationData.currentAddress;
+        const coords = locationData.currentCoords ? 
+            `${locationData.currentCoords.latitude.toFixed(6)}, ${locationData.currentCoords.longitude.toFixed(6)}` : "No GPS Data";
+        
         ctx.fillText(addr, padding, h - (barHeight * 0.35));
         ctx.fillText(`GPS: ${coords}`, padding, h - (barHeight * 0.15));
 
         // Right side: Project Branding (Placeholder)
         ctx.textAlign = "right";
         ctx.fillText("TIMESTAMP PRO CAMERA", w - padding, h - (barHeight * 0.15));
+        ctx.restore(); // Restore state
     }
 
     function savePhoto(dataUrl) {
