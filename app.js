@@ -19,10 +19,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (screen.orientation && screen.orientation.angle !== undefined) {
             deviceAngle = screen.orientation.angle;
         } else if (window.orientation !== undefined) {
-            deviceAngle = window.orientation;
+            deviceAngle = window.orientation; // Legacy iOS support
         } else {
             deviceAngle = 0;
         }
+
+        // Normalize angle: handle -90 as 270 for consistent logic
+        if (deviceAngle === -90) deviceAngle = 270;
+        if (deviceAngle === -270) deviceAngle = 90;
+
         applyLiveSettings();
     };
 
@@ -147,18 +152,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     function drawBurnInOverlay(ctx, w, h, locationData, currentSettings, angle) {
         ctx.save(); // Save state to avoid side effects
 
-        // Map local coordinates to physical orientation so the stamp is always at the visual bottom
-        if (angle === 90) { // Landscape Left (Clockwise)
-            ctx.translate(0, h);
-            ctx.rotate(-Math.PI / 2);
-            [w, h] = [h, w];
-        } else if (angle === -90 || angle === 270) { // Landscape Right
-            ctx.translate(w, 0);
-            ctx.rotate(Math.PI / 2);
-            [w, h] = [h, w];
-        } else if (Math.abs(angle) === 180) { // Upside Down
+        // Detect if the video buffer orientation matches the device orientation
+        const isBufferPortrait = h > w;
+        const isDeviceLandscape = (angle === 90 || angle === 270);
+
+        // Apply rotation only if buffer orientation differs from device physical orientation
+        if (isBufferPortrait && isDeviceLandscape) {
+            if (angle === 90) { // Device rotated Left (90 deg CCW)
+                ctx.translate(0, h);
+                ctx.rotate(-Math.PI / 2);
+                [w, h] = [h, w]; // Swap internal bounds for drawing calculations
+            } else if (angle === 270) { // Device rotated Right (90 deg CW)
+                ctx.translate(w, 0);
+                ctx.rotate(Math.PI / 2);
+                [w, h] = [h, w];
+            }
+        } else if (angle === 180) { // Upside Down
             ctx.translate(w, h);
-            ctx.rotate(180 * Math.PI / 180);
+            ctx.rotate(Math.PI);
         }
         
         // Use the smaller dimension for scaling to ensure consistency between portrait/landscape
@@ -263,13 +274,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             overlayBottom.style.inset = '';
 
             // Physical Location Mapping (Move UI based on rotation without rotating text)
-            if (deviceAngle === 90) { // Landscape Left -> Move to physical right (visual bottom)
+            if (deviceAngle === 90) { 
                 overlayBottom.style.inset = '20px 20px 20px auto';
                 overlayBottom.style.width = '200px';
                 overlayBottom.style.flexDirection = 'column';
                 overlayBottom.style.alignItems = 'flex-start';
                 overlayBottom.style.textAlign = 'left';
-            } else if (deviceAngle === -90 || deviceAngle === 270) { // Landscape Right -> Move to physical left (visual bottom)
+            } else if (deviceAngle === 270) { 
                 overlayBottom.style.inset = '20px auto 20px 20px';
                 overlayBottom.style.width = '200px';
                 overlayBottom.style.flexDirection = 'column';
