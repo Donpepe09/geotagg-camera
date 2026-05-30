@@ -1,0 +1,166 @@
+:root {
+    --glass-bg: rgba(0, 0, 0, 0.6);
+    --accent-color: #007AFF;
+    --text-main: #FFFFFF;
+    --text-dim: #BBBBBB;
+    --glass-border: rgba(255, 255, 255, 0.15);
+    --shutter-size: 72px;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+body, html {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    background-color: #000;
+    font-family: -apple-system, system-ui, sans-serif;
+    overflow: hidden;
+    color: var(--text-main);
+}
+
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.camera-viewport {
+    position: relative;
+    flex: 1;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+#video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Overlay UI */
+.overlay-container {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: calc(20px + env(safe-area-inset-top)) 20px 20px 20px;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.overlay-top {
+    display: flex;
+    gap: 10px;
+}
+
+.overlay-bottom {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 16px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+}
+
+.badge {
+    background: var(--glass-bg);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    border: 1px solid var(--glass-border);
+    font-weight: 500;
+}
+
+.primary-text { font-size: 17px; font-weight: 600; letter-spacing: -0.2px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+.secondary-text { font-size: 13px; color: var(--text-dim); font-weight: 400; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+
+/* Controls */
+.camera-controls {
+    height: 140px;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+}
+
+.shutter-btn {
+    width: var(--shutter-size);
+    height: var(--shutter-size);
+    border-radius: 50%;
+    background: transparent;
+    border: 2px solid #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 4px;
+    transition: all 0.2s ease;
+}
+
+.shutter-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+}
+
+.shutter-btn:active {
+    transform: scale(0.88);
+}
+
+.control-group {
+    display: flex;
+    gap: 20px;
+}
+
+.control-group button {
+    background: #1c1c1e;
+    border: none;
+    color: white;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    font-size: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.control-group button:active { 
+    transform: scale(0.85);
+    background: #2c2c2e;
+}
+
+/* Capture Flash */
+.flash-layer {
+    position: absolute;
+    inset: 0;
+    background: white;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 100;
+}
+
+/* Grid Overlay */
+.grid-overlay { position: absolute; inset: 0; pointer-events: none; }
+.v-line { position: absolute; top: 0; bottom: 0; width: 0.5px; background: rgba(255,255,255,0.2); }
+.h-line { position: absolute; left: 0; right: 0; height: 0.5px; background: rgba(255,255,255,0.2); }
+.hidden { display: none; }
+
+@media (orientation: landscape) {
+    .camera-controls { width: 140px; height: 100%; flex-direction: column; }
+}

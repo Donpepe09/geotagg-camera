@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TimeStamp Pro Camera</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body>
+    <div id="app">
+        <!-- Camera Preview -->
+        <div class="camera-viewport">
+            <video id="video" autoplay playsinline muted></video>
+            
+            <div id="flash-effect" class="flash-layer"></div>
+
+            <!-- Live Overlay UI -->
+            <div id="live-overlay" class="overlay-container">
+                <div class="overlay-top">
+                    <div id="gps-status" class="badge">🛰️ GPS: Acquiring...</div>
+                    <div id="compass-display" class="badge">🧭 --°</div>
+                </div>
+                <div class="overlay-bottom">
+                    <div class="meta-block">
+                        <div id="date-display" class="primary-text">--/--/----</div>
+                        <div id="time-display" class="secondary-text">00:00:00</div>
+                    </div>
+                    <div class="meta-block">
+                        <div id="address-display" class="primary-text">Detecting Address...</div>
+                        <div id="coords-display" class="secondary-text">0.0000, 0.0000</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Grid Lines -->
+            <div id="grid-lines" class="grid-overlay hidden">
+                <div class="v-line" style="left: 33.3%;"></div>
+                <div class="v-line" style="left: 66.6%;"></div>
+                <div class="h-line" style="top: 33.3%;"></div>
+                <div class="h-line" style="top: 66.6%;"></div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="camera-controls">
+            <div class="control-group">
+                <button id="toggle-grid" title="Toggle Grid">🌐</button>
+                <button id="switch-camera" title="Switch Camera">🔄</button>
+            </div>
+            
+            <button id="shutter" class="shutter-btn">
+                <div class="shutter-inner"></div>
+            </button>
+            
+            <div class="control-group">
+                <button id="open-settings" title="Settings">⚙️</button>
+                <button id="open-gallery" title="Gallery">🖼️</button>
+            </div>
+        </div>
+
+        <!-- Hidden rendering canvas -->
+        <canvas id="capture-canvas" style="display:none;"></canvas>
+    </div>
+
+    <!-- PWA Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js');
+        }
+    </script>
+    
+    <script src="camera.js"></script>
+    <script src="location.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
