@@ -4,6 +4,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     const canvas = document.getElementById('capture-canvas');
     const flashEffect = document.getElementById('flash-effect');
     
+    // --- IndexedDB for Persistent Storage ---
+    const DB_NAME = 'TimeStampGallery';
+    const STORE_NAME = 'photos';
+
+    async function initDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, 1);
+            request.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                }
+            };
+            request.onsuccess = (e) => resolve(e.target.result);
+            request.onerror = (e) => reject(e.target.error);
+        });
+    }
+
+    async function saveToDB(dataUrl) {
+        const db = await initDB();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).add({ dataUrl, date: Date.now() });
+    }
+
+    async function getFromDB() {
+        const db = await initDB();
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        return new Promise((resolve) => {
+            tx.objectStore(STORE_NAME).getAll().onsuccess = (e) => resolve(e.target.result);
+        });
+    }
+
     const camera = new CameraManager(video);
     const locSvc = new LocationManager();
     
@@ -62,7 +94,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Export as JPEG
         const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        savePhoto(dataUrl);
+        await saveToDB(dataUrl);
+        savePhoto(dataUrl); // Trigger download
     });
 
     function drawBurnInOverlay(ctx, w, h, locationData) {
@@ -112,6 +145,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('switch-camera').onclick = () => camera.switch();
     document.getElementById('toggle-grid').onclick = () => {
         document.getElementById('grid-lines').classList.toggle('hidden');
+    };
+
+    // Gallery Interaction Logic
+    const galleryView = document.getElementById('gallery-view');
+    const galleryGrid = document.getElementById('gallery-grid');
+
+    document.getElementById('open-gallery').onclick = async () => {
+        galleryGrid.innerHTML = '';
+        const photos = await getFromDB();
+        
+        // Show in reverse chronological order
+        photos.reverse().forEach(photo => {
+            const div = document.createElement('div');
+            div.className = 'gallery-item';
+            div.innerHTML = `<img src="${photo.dataUrl}" alt="Captured Photo">`;
+            galleryGrid.appendChild(div);
+        });
+        
+        galleryView.classList.remove('hidden');
+    };
+
+    document.getElementById('close-gallery').onclick = () => {
+        galleryView.classList.add('hidden');
     };
     
     // Request Orientation Permission (iOS 13+)
