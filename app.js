@@ -205,7 +205,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (overlayBottom) {
             overlayBottom.style.background = `rgba(0, 0, 0, ${settings.opacity})`;
         }
-        document.querySelectorAll('.primary-text, .secondary-text').forEach(el => {
+        
+        // Update Live Project Info
+        document.getElementById('project-display').innerText = settings.projectName || "TIMESTAMP PRO CAMERA";
+        document.getElementById('inspector-display').innerText = settings.inspector ? `Inspector: ${settings.inspector}` : "";
+
+        // Apply font color to all metadata
+        document.querySelectorAll('.overlay-bottom .primary-text, .overlay-bottom .secondary-text').forEach(el => {
             el.style.color = settings.fontColor;
         });
     }

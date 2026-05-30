@@ -65,12 +65,23 @@ body, html {
     border-radius: 16px;
     padding: 18px;
     display: flex;
-    flex-direction: column;
-    gap: 8px;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-end;
     border: 1px solid var(--glass-border);
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
     max-width: 500px; /* Prevent stretching on tablets */
     width: 100%;
+}
+
+.meta-left, .meta-right {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.meta-right {
+    text-align: right;
 }
 
 .badge {
