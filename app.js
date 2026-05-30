@@ -11,11 +11,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     const saveSettingsBtn = document.getElementById('save-settings');
     
     // Orientation Tracking
+    const overlayBottom = document.querySelector('.overlay-bottom');
     let deviceAngle = 0;
+
     const updateOrientation = () => {
-        deviceAngle = (window.orientation !== undefined) ? window.orientation : (screen.orientation ? screen.orientation.angle : 0);
+        // Use Screen Orientation API (modern) or window.orientation (legacy)
+        if (screen.orientation && screen.orientation.angle !== undefined) {
+            deviceAngle = screen.orientation.angle;
+        } else if (window.orientation !== undefined) {
+            deviceAngle = window.orientation;
+        } else {
+            deviceAngle = 0;
+        }
         applyLiveSettings();
     };
+
+    // Listen for orientation changes across different browsers
+    if (screen.orientation) {
+        screen.orientation.addEventListener('change', updateOrientation);
+    }
     window.addEventListener('orientationchange', updateOrientation);
     window.addEventListener('resize', updateOrientation);
 
@@ -61,9 +75,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const savedSettings = localStorage.getItem('tsp_settings');
     if (savedSettings) {
         settings = { ...settings, ...JSON.parse(savedSettings) };
-        applyLiveSettings();
-        updateOrientation();
     }
+    
+    // Initialize UI and Orientation state immediately
+    updateOrientation();
 
     function updateSettingsUI() {
         document.getElementById('setting-time-format').value = settings.timeFormat;
@@ -132,14 +147,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     function drawBurnInOverlay(ctx, w, h, locationData, currentSettings, angle) {
         ctx.save(); // Save state to avoid side effects
 
-        // Adjust drawing coordinates based on physical rotation
-        if (angle === 90) { // Landscape Left
-            ctx.translate(w, 0);
-            ctx.rotate(90 * Math.PI / 180);
+        // Map local coordinates to physical orientation so the stamp is always at the visual bottom
+        if (angle === 90) { // Landscape Left (Clockwise)
+            ctx.translate(0, h);
+            ctx.rotate(-Math.PI / 2);
             [w, h] = [h, w];
         } else if (angle === -90 || angle === 270) { // Landscape Right
-            ctx.translate(0, h);
-            ctx.rotate(-90 * Math.PI / 180);
+            ctx.translate(w, 0);
+            ctx.rotate(Math.PI / 2);
             [w, h] = [h, w];
         } else if (Math.abs(angle) === 180) { // Upside Down
             ctx.translate(w, h);
@@ -238,11 +253,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     function applyLiveSettings() {
-        const overlayBottom = document.querySelector('.overlay-bottom');
         if (overlayBottom) {
             // Background and Color
             overlayBottom.style.backgroundColor = `rgba(0, 0, 0, ${settings.opacity})`;
             
+            // Clear previous positioning to prevent conflicts during rotation
+            overlayBottom.style.top = ''; overlayBottom.style.bottom = '';
+            overlayBottom.style.left = ''; overlayBottom.style.right = '';
+            overlayBottom.style.inset = '';
+
             // Physical Location Mapping (Move UI based on rotation without rotating text)
             if (deviceAngle === 90) { // Landscape Left -> Move to physical right (visual bottom)
                 overlayBottom.style.inset = '20px 20px 20px auto';
