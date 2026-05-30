@@ -4,46 +4,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     const canvas = document.getElementById('capture-canvas');
     const flashEffect = document.getElementById('flash-effect');
     
-    // --- IndexedDB for Persistent Storage ---
-    const DB_NAME = 'TimeStampGallery';
-    const STORE_NAME = 'photos';
-
-    async function initDB() {
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open(DB_NAME, 1);
-            request.onupgradeneeded = (e) => {
-                const db = e.target.result;
-                if (!db.objectStoreNames.contains(STORE_NAME)) {
-                    db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
-                }
-            };
-            request.onsuccess = (e) => resolve(e.target.result);
-            request.onerror = (e) => reject(e.target.error);
-        });
-    }
-
-    async function saveToDB(dataUrl) {
-        const db = await initDB();
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        tx.objectStore(STORE_NAME).add({ dataUrl, date: Date.now() });
-    }
-
-    async function getFromDB() {
-        const db = await initDB();
-        const tx = db.transaction(STORE_NAME, 'readonly');
-        return new Promise((resolve) => {
-            tx.objectStore(STORE_NAME).getAll().onsuccess = (e) => resolve(e.target.result);
-        });
-    }
-
+    // Settings Elements
+    const settingsModal = document.getElementById('settings-modal');
+    const openSettingsBtn = document.getElementById('open-settings');
+    const closeSettingsBtn = document.getElementById('close-settings');
+    const saveSettingsBtn = document.getElementById('save-settings');
+    
     const camera = new CameraManager(video);
     const locSvc = new LocationManager();
+
+    let settings = {
+        timeFormat: '12h',
+        fontColor: '#ffffff',
+        opacity: 0.4,
+        projectName: '',
+        inspector: ''
+    };
     
     // 1. Start Camera
     try {
         await camera.start();
     } catch (err) {
         console.error("Failed to initialize camera:", err);
+    }
+
+    // Load Settings
+    const savedSettings = localStorage.getItem('tsp_settings');
+    if (savedSettings) {
+        settings = { ...settings, ...JSON.parse(savedSettings) };
+        applyLiveSettings();
+    }
+
+    function updateSettingsUI() {
+        document.getElementById('setting-time-format').value = settings.timeFormat;
+        document.getElementById('setting-font-color').value = settings.fontColor;
+        document.getElementById('setting-opacity').value = settings.opacity;
+        document.getElementById('setting-project-name').value = settings.projectName;
+        document.getElementById('setting-inspector').value = settings.inspector;
     }
 
     // 2. Start Location/Compass
@@ -62,7 +59,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     setInterval(() => {
         const now = new Date();
         document.getElementById('date-display').innerText = now.toLocaleDateString();
-        document.getElementById('time-display').innerText = now.toLocaleTimeString();
+        
+        const timeOptions = { 
+            hour12: settings.timeFormat === '12h',
+            hour: '2-digit', minute: '2-digit', second: '2-digit' 
+        };
+        document.getElementById('time-display').innerText = now.toLocaleTimeString([], timeOptions);
     }, 1000);
 
     // 4. Capture Logic (The "Burn-in" Engine)
@@ -90,15 +92,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
         // Add metadata overlay to the final image
-        drawBurnInOverlay(ctx, canvas.width, canvas.height, locSvc);
+        drawBurnInOverlay(ctx, canvas.width, canvas.height, locSvc, settings);
 
         // Export as JPEG
         const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        await saveToDB(dataUrl);
-        savePhoto(dataUrl); // Trigger download
+        savePhoto(dataUrl);
     });
 
-    function drawBurnInOverlay(ctx, w, h, locationData) {
+    function drawBurnInOverlay(ctx, w, h, locationData, currentSettings) {
         ctx.save(); // Save state to avoid side effects
         const padding = w * 0.03;
         const fontSizeMain = Math.max(24, w * 0.025);
@@ -106,10 +107,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Draw Semi-transparent Background Bar at bottom
         const barHeight = h * 0.15;
-        ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+        ctx.fillStyle = `rgba(0, 0, 0, ${currentSettings.opacity})`;
         ctx.fillRect(0, h - barHeight, w, barHeight);
 
-        ctx.fillStyle = "white";
+        ctx.fillStyle = currentSettings.fontColor;
         ctx.textAlign = "left";
         ctx.shadowColor = "black";
         ctx.shadowBlur = 4;
@@ -117,7 +118,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Top left: Timestamp
         ctx.font = `bold ${fontSizeMain}px Arial`;
         const now = new Date();
-        ctx.fillText(now.toLocaleString(), padding, h - (barHeight * 0.6));
+        const timeStr = now.toLocaleString([], {
+            hour12: currentSettings.timeFormat === '12h',
+            year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+        });
+        ctx.fillText(timeStr, padding, h - (barHeight * 0.6));
 
         // Bottom left: Location Info
         ctx.font = `${fontSizeSub}px Arial`;
@@ -130,7 +135,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Right side: Project Branding (Placeholder)
         ctx.textAlign = "right";
-        ctx.fillText("TIMESTAMP PRO CAMERA", w - padding, h - (barHeight * 0.15));
+        const brandText = currentSettings.projectName || "TIMESTAMP PRO CAMERA";
+        ctx.fillText(brandText, w - padding, h - (barHeight * 0.35));
+        
+        if (currentSettings.inspector) {
+            ctx.fillText(`Inspector: ${currentSettings.inspector}`, w - padding, h - (barHeight * 0.15));
+        }
         ctx.restore(); // Restore state
     }
 
@@ -142,32 +152,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // UI Interactions
+    openSettingsBtn.onclick = () => {
+        updateSettingsUI();
+        settingsModal.classList.remove('hidden');
+    };
+    closeSettingsBtn.onclick = () => settingsModal.classList.add('hidden');
+    
+    saveSettingsBtn.onclick = () => {
+        settings = {
+            timeFormat: document.getElementById('setting-time-format').value,
+            fontColor: document.getElementById('setting-font-color').value,
+            opacity: parseFloat(document.getElementById('setting-opacity').value),
+            projectName: document.getElementById('setting-project-name').value,
+            inspector: document.getElementById('setting-inspector').value
+        };
+        
+        localStorage.setItem('tsp_settings', JSON.stringify(settings));
+        applyLiveSettings();
+        settingsModal.classList.add('hidden');
+    };
+
+    function applyLiveSettings() {
+        const overlayBottom = document.querySelector('.overlay-bottom');
+        if (overlayBottom) {
+            overlayBottom.style.background = `rgba(0, 0, 0, ${settings.opacity})`;
+        }
+        document.querySelectorAll('.primary-text, .secondary-text').forEach(el => {
+            el.style.color = settings.fontColor;
+        });
+    }
+
     document.getElementById('switch-camera').onclick = () => camera.switch();
     document.getElementById('toggle-grid').onclick = () => {
         document.getElementById('grid-lines').classList.toggle('hidden');
-    };
-
-    // Gallery Interaction Logic
-    const galleryView = document.getElementById('gallery-view');
-    const galleryGrid = document.getElementById('gallery-grid');
-
-    document.getElementById('open-gallery').onclick = async () => {
-        galleryGrid.innerHTML = '';
-        const photos = await getFromDB();
-        
-        // Show in reverse chronological order
-        photos.reverse().forEach(photo => {
-            const div = document.createElement('div');
-            div.className = 'gallery-item';
-            div.innerHTML = `<img src="${photo.dataUrl}" alt="Captured Photo">`;
-            galleryGrid.appendChild(div);
-        });
-        
-        galleryView.classList.remove('hidden');
-    };
-
-    document.getElementById('close-gallery').onclick = () => {
-        galleryView.classList.add('hidden');
     };
     
     // Request Orientation Permission (iOS 13+)
