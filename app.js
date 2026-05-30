@@ -15,18 +15,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     let deviceAngle = 0;
 
     const updateOrientation = () => {
-        // Use Screen Orientation API (modern) or window.orientation (legacy)
-        if (screen.orientation && screen.orientation.angle !== undefined) {
-            deviceAngle = screen.orientation.angle;
-        } else if (window.orientation !== undefined) {
-            deviceAngle = window.orientation; // Legacy iOS support
-        } else {
-            deviceAngle = 0;
+        let angle = 0;
+        if (typeof window.orientation === 'number') {
+            angle = window.orientation; // iOS/Legacy
+        } else if (screen.orientation && screen.orientation.angle !== undefined) {
+            angle = screen.orientation.angle; // Android/Modern
         }
-
-        // Normalize angle: handle -90 as 270 for consistent logic
-        if (deviceAngle === -90) deviceAngle = 270;
-        if (deviceAngle === -270) deviceAngle = 90;
+        
+        // Normalize to 0, 90, 180, 270
+        deviceAngle = (angle + 360) % 360;
 
         applyLiveSettings();
     };
@@ -273,25 +270,41 @@ document.addEventListener('DOMContentLoaded', async () => {
             overlayBottom.style.left = ''; overlayBottom.style.right = '';
             overlayBottom.style.inset = '';
 
-            // Physical Location Mapping (Move UI based on rotation without rotating text)
-            if (deviceAngle === 90) { 
-                overlayBottom.style.inset = '20px 20px 20px auto';
-                overlayBottom.style.width = '200px';
-                overlayBottom.style.flexDirection = 'column';
-                overlayBottom.style.alignItems = 'flex-start';
-                overlayBottom.style.textAlign = 'left';
-            } else if (deviceAngle === 270) { 
-                overlayBottom.style.inset = '20px auto 20px 20px';
-                overlayBottom.style.width = '200px';
-                overlayBottom.style.flexDirection = 'column';
-                overlayBottom.style.alignItems = 'flex-start';
-                overlayBottom.style.textAlign = 'left';
+            // Adaptive UI Placement: Move stamp to the physical bottom and rotate text to be upright
+            if (deviceAngle === 90) { // Landscape Left
+                Object.assign(overlayBottom.style, {
+                    bottom: '50%',
+                    right: '20px',
+                    transform: 'translateY(50%) rotate(-90deg)',
+                    width: 'calc(100dvh - 80px)', // Map height to landscape width
+                    left: 'auto',
+                    top: 'auto'
+                });
+            } else if (deviceAngle === 270) { // Landscape Right
+                Object.assign(overlayBottom.style, {
+                    bottom: '50%',
+                    left: '20px',
+                    transform: 'translateY(50%) rotate(90deg)',
+                    width: 'calc(100dvh - 80px)',
+                    right: 'auto',
+                    top: 'auto'
+                });
+            } else if (deviceAngle === 180) { // Upside Down
+                Object.assign(overlayBottom.style, {
+                    top: '20px',
+                    left: '20px',
+                    right: '20px',
+                    transform: 'rotate(180deg)',
+                    bottom: 'auto'
+                });
             } else { // Portrait
-                overlayBottom.style.inset = 'auto 20px 20px 20px';
-                overlayBottom.style.width = 'auto';
-                overlayBottom.style.flexDirection = 'row';
-                overlayBottom.style.alignItems = 'flex-end';
-                overlayBottom.style.textAlign = 'left';
+                Object.assign(overlayBottom.style, {
+                    bottom: '20px',
+                    left: '20px',
+                    right: '20px',
+                    transform: 'none',
+                    width: 'auto'
+                });
             }
         }
         
