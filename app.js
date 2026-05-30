@@ -10,6 +10,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const closeSettingsBtn = document.getElementById('close-settings');
     const saveSettingsBtn = document.getElementById('save-settings');
     
+    // Orientation Tracking
+    let deviceAngle = 0;
+    const updateOrientation = () => {
+        deviceAngle = (window.orientation !== undefined) ? window.orientation : (screen.orientation ? screen.orientation.angle : 0);
+        applyLiveSettings();
+    };
+    window.addEventListener('orientationchange', updateOrientation);
+    window.addEventListener('resize', updateOrientation);
+
     // Gallery Elements
     const galleryModal = document.getElementById('gallery-modal');
     const openGalleryBtn = document.getElementById('open-gallery');
@@ -53,6 +62,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (savedSettings) {
         settings = { ...settings, ...JSON.parse(savedSettings) };
         applyLiveSettings();
+        updateOrientation();
     }
 
     function updateSettingsUI() {
@@ -112,15 +122,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
         // Add metadata overlay to the final image
-        drawBurnInOverlay(ctx, canvas.width, canvas.height, locSvc, settings);
+        drawBurnInOverlay(ctx, canvas.width, canvas.height, locSvc, settings, deviceAngle);
 
         // Export as JPEG
         const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
         savePhoto(dataUrl);
     });
 
-    function drawBurnInOverlay(ctx, w, h, locationData, currentSettings) {
+    function drawBurnInOverlay(ctx, w, h, locationData, currentSettings, angle) {
         ctx.save(); // Save state to avoid side effects
+
+        // Adjust drawing coordinates based on physical rotation
+        if (angle === 90) { // Landscape Left
+            ctx.translate(w, 0);
+            ctx.rotate(90 * Math.PI / 180);
+            [w, h] = [h, w];
+        } else if (angle === -90 || angle === 270) { // Landscape Right
+            ctx.translate(0, h);
+            ctx.rotate(-90 * Math.PI / 180);
+            [w, h] = [h, w];
+        } else if (Math.abs(angle) === 180) { // Upside Down
+            ctx.translate(w, h);
+            ctx.rotate(180 * Math.PI / 180);
+        }
         
         // Use the smaller dimension for scaling to ensure consistency between portrait/landscape
         const scaleBase = Math.min(w, h);
@@ -216,7 +240,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     function applyLiveSettings() {
         const overlayBottom = document.querySelector('.overlay-bottom');
         if (overlayBottom) {
-            overlayBottom.style.background = `rgba(0, 0, 0, ${settings.opacity})`;
+            // Background and Color
+            overlayBottom.style.backgroundColor = `rgba(0, 0, 0, ${settings.opacity})`;
+            
+            // Physical Location Mapping (Move UI based on rotation without rotating text)
+            if (deviceAngle === 90) { // Landscape Left -> Move to physical right (visual bottom)
+                overlayBottom.style.inset = '20px 20px 20px auto';
+                overlayBottom.style.width = '200px';
+                overlayBottom.style.flexDirection = 'column';
+                overlayBottom.style.alignItems = 'flex-start';
+                overlayBottom.style.textAlign = 'left';
+            } else if (deviceAngle === -90 || deviceAngle === 270) { // Landscape Right -> Move to physical left (visual bottom)
+                overlayBottom.style.inset = '20px auto 20px 20px';
+                overlayBottom.style.width = '200px';
+                overlayBottom.style.flexDirection = 'column';
+                overlayBottom.style.alignItems = 'flex-start';
+                overlayBottom.style.textAlign = 'left';
+            } else { // Portrait
+                overlayBottom.style.inset = 'auto 20px 20px 20px';
+                overlayBottom.style.width = 'auto';
+                overlayBottom.style.flexDirection = 'row';
+                overlayBottom.style.alignItems = 'flex-end';
+                overlayBottom.style.textAlign = 'left';
+            }
         }
         
         // Update Live Project Info
