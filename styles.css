@@ -183,12 +183,6 @@ body, html {
     .overlay-container {
         padding: calc(20px + env(safe-area-inset-top)) 20px 20px calc(20px + env(safe-area-inset-left));
     }
-    .overlay-bottom {
-        flex-direction: row;
-        justify-content: space-between;
-        align-items: flex-end;
-        max-width: none;
-    }
 }
 
 /* Settings Modal Styles */
