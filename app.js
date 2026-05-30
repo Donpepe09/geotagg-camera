@@ -121,46 +121,73 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function drawBurnInOverlay(ctx, w, h, locationData, currentSettings) {
         ctx.save(); // Save state to avoid side effects
-        const padding = w * 0.03;
-        const fontSizeMain = Math.max(24, w * 0.025);
-        const fontSizeSub = fontSizeMain * 0.7;
+        const isPortrait = h > w;
+        
+        // Responsive Scaling: use min dimension for consistent font size across orientations
+        const minDim = Math.min(w, h);
+        const padding = minDim * 0.05;
+        const fontSizeMain = Math.max(20, minDim * 0.04);
+        const fontSizeSub = fontSizeMain * 0.75;
 
         // Draw Semi-transparent Background Bar at bottom
-        const barHeight = h * 0.15;
+        const barHeight = isPortrait ? h * 0.14 : h * 0.22;
         ctx.fillStyle = `rgba(0, 0, 0, ${currentSettings.opacity})`;
         ctx.fillRect(0, h - barHeight, w, barHeight);
 
         ctx.fillStyle = currentSettings.fontColor;
-        ctx.textAlign = "left";
         ctx.shadowColor = "black";
         ctx.shadowBlur = 4;
 
-        // Top left: Timestamp
-        ctx.font = `bold ${fontSizeMain}px Arial`;
         const now = new Date();
         const timeStr = now.toLocaleString([], {
             hour12: currentSettings.timeFormat === '12h',
             year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
         });
-        ctx.fillText(timeStr, padding, h - (barHeight * 0.6));
 
-        // Bottom left: Location Info
-        ctx.font = `${fontSizeSub}px Arial`;
         const addr = locationData.currentAddress;
         const coords = locationData.currentCoords ? 
             `${locationData.currentCoords.latitude.toFixed(6)}, ${locationData.currentCoords.longitude.toFixed(6)}` : "No GPS Data";
-        
-        ctx.fillText(addr, padding, h - (barHeight * 0.35));
-        ctx.fillText(`GPS: ${coords}`, padding, h - (barHeight * 0.15));
-
-        // Right side: Project Branding (Placeholder)
-        ctx.textAlign = "right";
         const brandText = currentSettings.projectName || "TIMESTAMP PRO CAMERA";
-        ctx.fillText(brandText, w - padding, h - (barHeight * 0.35));
-        
-        if (currentSettings.inspector) {
-            ctx.fillText(`Inspector: ${currentSettings.inspector}`, w - padding, h - (barHeight * 0.15));
+
+        if (isPortrait) {
+            // Portrait Layout: Stacked vertically
+            ctx.textAlign = "left";
+            
+            // Line 1: Time
+            ctx.font = `bold ${fontSizeMain}px Arial`;
+            ctx.fillText(timeStr, padding, h - (barHeight * 0.78));
+
+            // Line 2 & 3: Location
+            ctx.font = `${fontSizeSub}px Arial`;
+            ctx.fillText(addr, padding, h - (barHeight * 0.62));
+            ctx.fillText(`GPS: ${coords}`, padding, h - (barHeight * 0.48));
+
+            // Line 4 & 5: Project Info (Right Aligned)
+            ctx.textAlign = "right";
+            ctx.fillText(brandText, w - padding, h - (barHeight * 0.28));
+            if (currentSettings.inspector) {
+                ctx.fillText(`Insp: ${currentSettings.inspector}`, w - padding, h - (barHeight * 0.14));
+            }
+        } else {
+            // Landscape Layout: Spread horizontally
+            ctx.textAlign = "left";
+            
+            // Left Side
+            ctx.font = `bold ${fontSizeMain}px Arial`;
+            ctx.fillText(timeStr, padding, h - (barHeight * 0.70));
+            
+            ctx.font = `${fontSizeSub}px Arial`;
+            ctx.fillText(addr, padding, h - (barHeight * 0.45));
+            ctx.fillText(`GPS: ${coords}`, padding, h - (barHeight * 0.20));
+
+            // Right Side
+            ctx.textAlign = "right";
+            ctx.fillText(brandText, w - padding, h - (barHeight * 0.45));
+            if (currentSettings.inspector) {
+                ctx.fillText(`Inspector: ${currentSettings.inspector}`, w - padding, h - (barHeight * 0.20));
+            }
         }
+        
         ctx.restore(); // Restore state
     }
 
