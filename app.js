@@ -15,23 +15,56 @@ document.addEventListener('DOMContentLoaded', async () => {
     let deviceAngle = 0;
 
     const updateOrientation = () => {
-        let angle = 0;
-        if (typeof window.orientation === 'number') {
-            angle = window.orientation; // iOS/Legacy
-        } else if (screen.orientation && screen.orientation.angle !== undefined) {
-            angle = screen.orientation.angle; // Android/Modern
-        }
-        
-        // Normalize to 0, 90, 180, 270
-        deviceAngle = (angle + 360) % 360;
-
-        applyLiveSettings();
+        // Small delay to ensure browser metrics are updated
+        setTimeout(() => {
+            let angle = 0;
+            if (typeof window.orientation === 'number') {
+                angle = window.orientation; // iOS/Legacy
+            } else if (screen.orientation && screen.orientation.angle !== undefined) {
+                angle = screen.orientation.angle; // Android/Modern
+            }
+            
+            // Normalize to 0, 90, 180, 270
+            deviceAngle = (angle + 360) % 360;
+            applyLiveSettings();
+        }, 150);
     };
 
-    // Listen for orientation changes across different browsers
-    if (screen.orientation) {
-        screen.orientation.addEventListener('change', updateOrientation);
-    }
+    // Sensor-based fallback for locked-UI scenarios
+    const handlePhysicalMotion = (event) => {
+        const { beta, gamma } = event;
+        if (beta === null || gamma === null) return;
+
+        let physicalAngle = deviceAngle;
+        // Heuristic to detect orientation from gravity vector
+        if (Math.abs(beta) < 45 && Math.abs(gamma) > 40) {
+            physicalAngle = gamma > 0 ? 90 : 270;
+        } else if (beta < -40 && Math.abs(gamma) < 40) {
+            physicalAngle = 180;
+        } else if (beta > 40 && Math.abs(gamma) < 40) {
+            physicalAngle = 0;
+        }
+
+        if (physicalAngle !== deviceAngle) {
+            deviceAngle = physicalAngle;
+            applyLiveSettings();
+        }
+    };
+
+    const initSensors = async () => {
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            try {
+                const permission = await DeviceOrientationEvent.requestPermission();
+                if (permission === 'granted') {
+                    window.addEventListener('deviceorientation', handlePhysicalMotion);
+                }
+            } catch (e) { console.warn("Sensor permission denied", e); }
+        } else {
+            window.addEventListener('deviceorientation', handlePhysicalMotion);
+        }
+    };
+
+    if (screen.orientation) screen.orientation.addEventListener('change', updateOrientation);
     window.addEventListener('orientationchange', updateOrientation);
     window.addEventListener('resize', updateOrientation);
 
@@ -270,13 +303,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             overlayBottom.style.left = ''; overlayBottom.style.right = '';
             overlayBottom.style.inset = '';
 
-            // Adaptive UI Placement: Move stamp to the physical bottom and rotate text to be upright
+            // Adjust UI to the "Physical Bottom" of the world
             if (deviceAngle === 90) { // Landscape Left
                 Object.assign(overlayBottom.style, {
                     bottom: '50%',
                     right: '20px',
                     transform: 'translateY(50%) rotate(-90deg)',
-                    width: 'calc(100dvh - 80px)', // Map height to landscape width
+                    width: 'calc(100% - 160px)', // Safe space for controls
+                    maxWidth: '80vh',
                     left: 'auto',
                     top: 'auto'
                 });
@@ -285,7 +319,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     bottom: '50%',
                     left: '20px',
                     transform: 'translateY(50%) rotate(90deg)',
-                    width: 'calc(100dvh - 80px)',
+                    width: 'calc(100% - 160px)',
+                    maxWidth: '80vh',
                     right: 'auto',
                     top: 'auto'
                 });
@@ -374,5 +409,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
     
     // Request Orientation Permission (iOS 13+)
-    document.body.addEventListener('click', () => { if(typeof DeviceOrientationEvent.requestPermission === 'function') DeviceOrientationEvent.requestPermission(); }, {once: true});
+    document.body.addEventListener('click', () => { 
+        initSensors(); 
+    }, {once: true});
 });
