@@ -10,8 +10,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     const closeSettingsBtn = document.getElementById('close-settings');
     const saveSettingsBtn = document.getElementById('save-settings');
     
+    // Gallery Elements
+    const galleryModal = document.getElementById('gallery-modal');
+    const openGalleryBtn = document.getElementById('open-gallery');
+    const closeGalleryBtn = document.getElementById('close-gallery');
+    const galleryGrid = document.getElementById('gallery-grid');
+
     const camera = new CameraManager(video);
     const locSvc = new LocationManager();
+
+    // IndexedDB Initialization for Gallery Storage
+    let db;
+    const dbRequest = indexedDB.open("TimeStampProDB", 1);
+
+    dbRequest.onupgradeneeded = (e) => {
+        const database = e.target.result;
+        if (!database.objectStoreNames.contains('photos')) {
+            database.createObjectStore('photos', { keyPath: 'id', autoIncrement: true });
+        }
+    };
+    dbRequest.onsuccess = (e) => {
+        db = e.target.result;
+    };
 
     let settings = {
         timeFormat: '12h',
@@ -145,10 +165,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function savePhoto(dataUrl) {
+        // 1. Download to device storage
         const link = document.createElement('a');
         link.download = `IMG_TS_${Date.now()}.jpg`;
         link.href = dataUrl;
         link.click();
+
+        // 2. Save to In-App Gallery (IndexedDB)
+        if (db) {
+            const transaction = db.transaction(['photos'], 'readwrite');
+            const store = transaction.objectStore('photos');
+            store.add({ dataUrl, timestamp: Date.now() });
+        }
     }
 
     // UI Interactions
@@ -180,6 +208,56 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.querySelectorAll('.primary-text, .secondary-text').forEach(el => {
             el.style.color = settings.fontColor;
         });
+    }
+
+    // Gallery UI Handlers
+    openGalleryBtn.onclick = () => {
+        renderGallery();
+        galleryModal.classList.remove('hidden');
+    };
+    closeGalleryBtn.onclick = () => galleryModal.classList.add('hidden');
+
+    function renderGallery() {
+        if (!db) return;
+        
+        galleryGrid.innerHTML = '';
+        const transaction = db.transaction(['photos'], 'readonly');
+        const store = transaction.objectStore('photos');
+        const request = store.getAll();
+
+        request.onsuccess = () => {
+            const photos = request.result;
+            if (photos.length === 0) {
+                galleryGrid.innerHTML = '<div class="empty-gallery">No photos captured yet.</div>';
+                return;
+            }
+
+            // Sort by newest first
+            photos.sort((a, b) => b.timestamp - a.timestamp).forEach(photo => {
+                const item = document.createElement('div');
+                item.className = 'gallery-item';
+                
+                const img = document.createElement('img');
+                img.src = photo.dataUrl;
+                
+                const delBtn = document.createElement('button');
+                delBtn.className = 'delete-btn';
+                delBtn.innerHTML = '✕';
+                delBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    deletePhoto(photo.id);
+                };
+
+                item.appendChild(img);
+                item.appendChild(delBtn);
+                galleryGrid.appendChild(item);
+            });
+        };
+    }
+
+    function deletePhoto(id) {
+        if (!confirm('Are you sure you want to delete this photo?')) return;
+        db.transaction(['photos'], 'readwrite').objectStore('photos').delete(id).onsuccess = () => renderGallery();
     }
 
     document.getElementById('switch-camera').onclick = () => camera.switch();
